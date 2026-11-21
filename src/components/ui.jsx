@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { amountInput, digits, shamsi, toIso, today } from '../utils'
 
 export const Modal = ({ title, onClose, children }) => (
@@ -11,8 +11,8 @@ export const Modal = ({ title, onClose, children }) => (
 
 export const Field = ({ label, children }) => <div className="field"><label>{label}</label>{children}</div>
 
-export const AmountInput = ({ value, onChange }) => (
-  <input inputMode="numeric" value={amountInput(value)} placeholder="۰" required
+export const AmountInput = ({ value, onChange, optional }) => (
+  <input inputMode="numeric" value={amountInput(value)} placeholder="۰" required={!optional}
     onChange={e => onChange(digits(e.target.value).replace(/\D/g, ''))} />
 )
 
@@ -24,11 +24,13 @@ const jparts = iso => {
   const p = new Intl.DateTimeFormat('en-US-u-ca-persian-nu-latn', {year:'numeric',month:'numeric',day:'numeric',timeZone:'UTC'}).formatToParts(d)
   return Object.fromEntries(p.map(x=>[x.type,x.value]))
 }
-export function DateInput({ value, onChange }) {
+// optional: the date may stay empty (a clear button appears). Typing/choosing always yields an ISO date.
+export function DateInput({ value, onChange, optional }) {
   const selected = jparts(value || today())
   const [open, setOpen] = useState(false)
   const [view, setView] = useState({ year:Number(selected.year), month:Number(selected.month) })
   const [text, setText] = useState(() => shamsi(value))
+  useEffect(() => { setText(shamsi(value)) }, [value]) // follow changes made from outside (reset, calendar)
   const changeMonth = delta => setView(v => {
     let m=v.month+delta,y=v.year; if(m<1){m=12;y--} if(m>12){m=1;y++} return {year:y,month:m}
   })
@@ -44,9 +46,9 @@ export function DateInput({ value, onChange }) {
     return d.length>6 ? `${d.slice(0,4)}/${d.slice(4,6)}/${d.slice(6)}` : d.length>4 ? `${d.slice(0,4)}/${d.slice(4)}` : d
   }
   return <div className="date-picker-wrap">
-    <div className="date-input-row"><input value={text} placeholder="۱۴۰۵/۰۹/۰۱" inputMode="numeric" required aria-invalid={!!(text&&!toIso(text))}
-      onChange={e=>{const masked=maskDate(e.target.value);setText(masked);const iso=toIso(masked);if(iso){onChange(iso);const p=jparts(iso);setView({year:+p.year,month:+p.month})}}}/>
-      <button type="button" className="btn calendar-trigger" aria-label="بازکردن تقویم" onClick={()=>setOpen(v=>!v)}>▦ تقویم</button></div>
+    <div className="date-input-row"><input value={text} placeholder="۱۴۰۵/۰۹/۰۱" inputMode="numeric" required={!optional} aria-invalid={!!(text&&!toIso(text))}
+      onChange={e=>{const masked=maskDate(e.target.value);setText(masked);const iso=toIso(masked);if(!masked&&optional)onChange('');if(iso){onChange(iso);const p=jparts(iso);setView({year:+p.year,month:+p.month})}}}/>
+      <button type="button" className="btn calendar-trigger" aria-label="بازکردن تقویم" onClick={()=>setOpen(v=>!v)}>▦ تقویم</button>{optional&&value&&<button type="button" className="btn" onClick={()=>{onChange('');setText('')}}>پاک‌کردن</button>}</div>
     {open&&<div className="jalali-calendar" dir="rtl">
       <div className="calendar-head"><button type="button" onClick={()=>changeMonth(1)}>‹</button><strong>{JMONTHS[view.month-1]} {view.year}</strong><button type="button" onClick={()=>changeMonth(-1)}>›</button></div>
       <div className="calendar-grid">{JWEEK.map(w=><span className="weekday" key={w}>{w}</span>)}{Array.from({length:offset},(_,i)=><span className="calendar-blank" key={'b'+i}/>)}{days.map(({d,iso})=><button type="button" key={iso} className={'calendar-day '+(iso===selectedIso?'selected ':'')+(iso===todayIso?'today':'')} onClick={()=>choose(iso)}>{new Intl.NumberFormat('fa-IR').format(d)}</button>)}</div>
