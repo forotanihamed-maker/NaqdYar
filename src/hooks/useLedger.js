@@ -42,7 +42,13 @@ export function useLedger(notify) {
     }))
     notify('پیگیری اصلاح شد')
   }
-  function deleteFollowUp(id) { if (!window.confirm('پیگیری حذف شود؟')) return; setData(c => ({ ...c, followUps: (c.followUps || []).filter(f => f.id !== id) })); notify('پیگیری حذف شد') }
+  // Destructive actions run immediately and offer «بازگردانی» in the toast instead of a blocking confirm dialog.
+  function deleteFollowUp(id) {
+    const f = (data.followUps || []).find(x => x.id === id)
+    if (!f) return
+    setData(c => ({ ...c, followUps: (c.followUps || []).filter(x => x.id !== id) }))
+    notify('پیگیری حذف شد', () => setData(c => ({ ...c, followUps: [f, ...(c.followUps || [])] })))
+  }
   function addPayment(itemId, form) {
     const amount = parseAmount(form.amount), item = data.items.find(i => i.id === itemId)
     if (!item || item.type !== 'account' || amount === null || amount > balance(item, data.payments)) { notify('مبلغ باید بیشتر از صفر و حداکثر برابر مانده باشد'); return false }
@@ -57,7 +63,10 @@ export function useLedger(notify) {
     if (amount + other > item.amount) { notify('مجموع پرداخت‌ها نمی‌تواند بیشتر از مبلغ حساب باشد'); return false }
     setData(c => ({ ...c, payments: c.payments.map(x => x.id === id ? { ...x, amount, date: form.date, note: String(form.note || '').trim(), updatedAt: stamp() } : x) })); notify('پرداخت اصلاح شد'); return true
   }
-  function deletePayment(id) { if (!window.confirm('این پرداخت حذف شود؟ مانده حساب مجدداً محاسبه می‌شود.')) return; setData(c=>({...c,payments:c.payments.map(p=>p.id===id?{...p,deletedAt:stamp()}:p)})); notify('پرداخت حذف شد') }
+  function deletePayment(id) {
+    setData(c => ({ ...c, payments: c.payments.map(p => p.id === id ? { ...p, deletedAt: stamp() } : p) }))
+    notify('پرداخت حذف شد؛ مانده حساب دوباره محاسبه شد', () => setData(c => ({ ...c, payments: c.payments.map(p => p.id === id ? { ...p, deletedAt: null } : p) })))
+  }
   function addPromise(form) {
     const amount = parseAmount(form.amount)
     if (!form.personId || amount === null || !form.date) { notify('مشتری، مبلغ و تاریخ وعده را وارد کنید'); return false }
@@ -65,15 +74,24 @@ export function useLedger(notify) {
     setData(c => ({ ...c, promises: [p, ...(c.promises || [])] })); notify('وعده پرداخت ثبت شد؛ مانده بدهی تغییری نکرد'); return true
   }
   // promises are cancelled, never deleted, so history stays traceable
-  const cancelPromise = id => { if (window.confirm('وعده لغو شود؟ در تاریخچه می‌ماند.')) setData(c => ({ ...c, promises: (c.promises || []).map(p => p.id === id ? { ...p, cancelled: true, updatedAt: stamp() } : p) })) }
-  const setStatus = (id, status) => setData(c => ({ ...c, items: c.items.map(i => i.id === id ? { ...i, status, updatedAt: stamp() } : i) }))
+  const cancelPromise = id => {
+    setData(c => ({ ...c, promises: (c.promises || []).map(p => p.id === id ? { ...p, cancelled: true, updatedAt: stamp() } : p) }))
+    notify('وعده لغو شد؛ در تاریخچه می‌ماند', () => setData(c => ({ ...c, promises: (c.promises || []).map(p => p.id === id ? { ...p, cancelled: false } : p) })))
+  }
+  function setStatus(id, status) {
+    const prev = data.items.find(i => i.id === id)
+    if (!prev) return
+    setData(c => ({ ...c, items: c.items.map(i => i.id === id ? { ...i, status, updatedAt: stamp() } : i) }))
+    const word = prev.dir === 'in' ? 'وصول' : 'پاس'
+    const msg = status === 'done' ? `به‌عنوان ${word}‌شده ثبت شد` : status === 'bounced' ? 'به‌عنوان برگشتی ثبت شد' : 'دوباره باز شد'
+    notify(msg, () => setData(c => ({ ...c, items: c.items.map(i => i.id === id ? prev : i) })))
+  }
   // Soft delete: the item and its payments leave every screen but stay in the backup file.
   function remove(item) {
-    if (!window.confirm('این مورد از فهرست‌ها حذف شود؟ در فایل پشتیبان نگه داشته می‌شود.')) return
     setData(c => ({ ...c, items: c.items.map(i => (i.id === item.id ? { ...i, deletedAt: stamp() } : i)) }))
-    notify('حذف شد')
+    notify('سند حذف شد (در فایل پشتیبان می‌ماند)', () => setData(c => ({ ...c, items: c.items.map(i => (i.id === item.id ? { ...i, deletedAt: null } : i)) })))
   }
-  const importData = backup => { setData(normalize(backup)); notify('اطلاعات بازیابی شد') }
+  const importData = backup => { const prev = data; setData(normalize(backup)); notify('اطلاعات از فایل پشتیبان بازیابی شد', () => setData(prev)) }
   // Screens get `data` without deleted items; the backup page gets `raw` with everything.
   const view = useMemo(() => {
     const items = data.items.filter(i => !i.deletedAt)

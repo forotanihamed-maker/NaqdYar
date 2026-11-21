@@ -1,3 +1,5 @@
+import { BACKUP_KEY } from './constants'
+
 const nf = new Intl.NumberFormat('fa-IR')
 export const fmt = v => nf.format(Number(v || 0))
 export const rial = v => fmt(v) + ' ریال'
@@ -11,7 +13,7 @@ export const digits = v => String(v ?? '')
 // "1234567" -> "۱,۲۳۴,۵۶۷" for amount inputs
 export const amountInput = v => {
   const d = digits(v).replace(/\D/g, '')
-  return d ? BigInt(d).toLocaleString('en-US').replace(/[0-9]/g, x => '۰۱۲۳۴۵۶۷۸۹'[x]) : ''
+  return d ? BigInt(d).toLocaleString('en-US').replace(/,/g, '٬').replace(/[0-9]/g, x => '۰۱۲۳۴۵۶۷۸۹'[x]) : ''
 }
 
 export const today = () => {
@@ -35,11 +37,21 @@ export const toIso = input => {
   if (!m) return null
   const [y, mo, da] = m.slice(1).map(Number)
   if (mo < 1 || mo > 12 || da < 1 || da > 31) return null
-  const start = Date.UTC(y + 621, 2, 15)
-  for (let o = 0; o <= 370; o++) {
-    const d = new Date(start + o * 864e5)
+  // day of the Persian year (months 1-6 have 31 days, 7-12 have 30); Nowruz falls on Mar 19-22
+  const doy = (mo <= 6 ? (mo - 1) * 31 : 186 + (mo - 7) * 30) + da - 1
+  const base = Date.UTC(y + 621, 2, 19) + doy * 864e5
+  for (let o = -2; o <= 6; o++) {
+    const d = new Date(base + o * 864e5)
     const p = Object.fromEntries(cal.formatToParts(d).map(x => [x.type, x.value]))
     if (+p.year === y && +p.month === mo && +p.day === da) return d.toISOString().slice(0, 10)
   }
   return null
 }
+
+export const addDays = (iso, n) => new Date(Date.parse(iso) + n * 864e5).toISOString().slice(0, 10)
+// rial -> toman (display only)
+export const toman = v => fmt(Math.floor(Number(v || 0) / 10))
+
+// Data only lives in this browser, so we remember when the user last downloaded a backup.
+export const lastBackup = () => { try { return localStorage.getItem(BACKUP_KEY) } catch { return null } }
+export const markBackup = () => { try { localStorage.setItem(BACKUP_KEY, today()) } catch { /* ignore */ } }

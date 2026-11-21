@@ -1,13 +1,92 @@
 import { balance, isLate, isOpen, sumBy } from '../domain/ledger'
-import { daysTo, fmt, rial, shamsi,today } from '../utils'
+import { daysTo, fmt, lastBackup, rial, shamsi, today } from '../utils'
 import ItemRow from '../components/ItemRow'
-export default function Home({ items, nameOf, api, onAdd, payments = [],followUps=[] }) {
- const open=items.filter(i=>isOpen(i,payments)),ins=open.filter(i=>i.dir==='in'),outs=open.filter(i=>i.dir==='out'),lateIn=ins.filter(i=>isLate(i,payments)),lateOut=outs.filter(i=>isLate(i,payments)),soon=open.filter(i=>daysTo(i.due)>=0&&daysTo(i.due)<=7).sort((a,b)=>a.due.localeCompare(b.due))
- const net=sumBy(ins.filter(i=>daysTo(i.due)<=30),i=>balance(i,payments))-sumBy(outs.filter(i=>daysTo(i.due)<=30),i=>balance(i,payments)), dueFollow=(followUps||[]).filter(f=>f.nextFollowUpDate&&f.nextFollowUpDate<=today()).sort((a,b)=>a.nextFollowUpDate.localeCompare(b.nextFollowUpDate))
- const max=Math.max(1,sumBy(ins,i=>balance(i,payments)),sumBy(outs,i=>balance(i,payments)))
- return <><div className="head"><div><h1>نمای کلی نقدیار</h1><p className="sub">وضعیت نقدینگی، سررسیدها و پیگیری‌ها</p></div><button className="btn p" onClick={onAdd}>+ ثبت چک یا حساب</button></div>
- <section className="cards"><div className="card"><small>دریافتنی باز</small><b className="in-t">{rial(sumBy(ins,i=>balance(i,payments)))}</b></div><div className="card"><small>پرداختنی باز</small><b className="out-t">{rial(sumBy(outs,i=>balance(i,payments)))}</b></div><div className="card"><small>معوق دریافتنی</small><b className="bad">{rial(sumBy(lateIn,i=>balance(i,payments)))} · {fmt(lateIn.length)} مورد</b></div><div className="card"><small>معوق پرداختنی</small><b className="bad">{rial(sumBy(lateOut,i=>balance(i,payments)))}</b></div><div className="card"><small>خالص ۳۰ روز مورد انتظار</small><b className={net<0?'bad':'in-t'}>{rial(net)}</b></div><div className="card"><small>پیگیری عقب‌افتاده/امروز</small><b className="bad">{fmt(dueFollow.length)}</b></div></section>
- <section className="card"><h2>مقایسه مانده‌ها</h2><div className="barrow"><span>دریافتنی</span><div className="bartrack"><div className="barfill inbar" style={{width:`${Math.max(2,sumBy(ins,i=>balance(i,payments))/max*100)}%`}}/></div><strong>{rial(sumBy(ins,i=>balance(i,payments)))}</strong></div><div className="barrow"><span>پرداختنی</span><div className="bartrack"><div className="barfill outbar" style={{width:`${Math.max(2,sumBy(outs,i=>balance(i,payments))/max*100)}%`}}/></div><strong>{rial(sumBy(outs,i=>balance(i,payments)))}</strong></div><small className="sub">نمودار نسبت به بزرگ‌ترین مقدار باز است.</small></section>
- <section className="card"><h2>معوق‌ها</h2>{[...lateIn,...lateOut].length?[...lateIn,...lateOut].sort((a,b)=>a.due.localeCompare(b.due)).map(i=><ItemRow key={i.id} item={i} name={nameOf(i.personId)} api={api} payments={payments}/>):<p className="empty">معوقی نیست.</p>}</section><section className="card"><h2>سررسید ۷ روز آینده</h2>{soon.length?soon.map(i=><ItemRow key={i.id} item={i} name={nameOf(i.personId)} api={api} payments={payments}/>):<p className="empty">سررسید آینده‌ای نیست.</p>}</section><section className="card"><h2>پیگیری‌های موعددار</h2>{dueFollow.length?dueFollow.map(f=><div className="payment-row" key={f.id}><strong>{nameOf(f.personId)}</strong><span>{shamsi(f.nextFollowUpDate)}</span><span>{f.note||f.result}</span></div>):<p className="empty">پیگیری موعددار نیست.</p>}</section>
- </>
+import { Badge, Stat } from '../components/ui'
+
+const LIMIT = 5
+
+// A list block that shows the first few rows and a "see all" link instead of an endless page.
+function Block({ title, count, tone, children, onAll, allLabel }) {
+  return <section className="card block">
+    <div className="block-head">
+      <h2>{title} {count > 0 && <Badge tone={tone}>{fmt(count)}</Badge>}</h2>
+      {onAll && count > LIMIT && <button type="button" className="btn sm ghost" onClick={onAll}>{allLabel || 'مشاهده همه'} ({fmt(count)})</button>}
+    </div>
+    {children}
+  </section>
+}
+
+export default function Home({ items, people, nameOf, api, onAdd, payments = [], followUps = [], go, onPerson }) {
+  const open = items.filter(i => isOpen(i, payments))
+  const ins = open.filter(i => i.dir === 'in'), outs = open.filter(i => i.dir === 'out')
+  const bal = i => balance(i, payments)
+  const lateIn = ins.filter(i => isLate(i, payments)), lateOut = outs.filter(i => isLate(i, payments))
+  const late = [...lateIn, ...lateOut].sort((a, b) => a.due.localeCompare(b.due))
+  const soon = open.filter(i => daysTo(i.due) >= 0 && daysTo(i.due) <= 7).sort((a, b) => a.due.localeCompare(b.due))
+  const within30 = list => sumBy(list.filter(i => daysTo(i.due) <= 30), bal)
+  const net = within30(ins) - within30(outs)
+  const dueFollow = followUps.filter(f => f.nextFollowUpDate && f.nextFollowUpDate <= today()).sort((a, b) => a.nextFollowUpDate.localeCompare(b.nextFollowUpDate))
+  const sumIn = sumBy(ins, bal), sumOut = sumBy(outs, bal)
+  const max = Math.max(1, sumIn, sumOut)
+  const needsAction = late.length + soon.length + dueFollow.length
+
+  if (!items.length && !people.length) {
+    return <>
+      <div className="head"><div><h1>به نقدیار خوش آمدید</h1><p className="sub">دفتر چک‌ها و مطالبات شما؛ همه‌چیز فقط روی همین دستگاه ذخیره می‌شود.</p></div></div>
+      <section className="card welcome">
+        <h2>با سه قدم شروع کنید</h2>
+        <ol>
+          <li><b>ثبت چک یا حساب:</b> مبلغ، شخص و تاریخ سررسید را وارد کنید.</li>
+          <li><b>هر روز نمای کلی را ببینید:</b> معوق‌ها و سررسیدهای نزدیک همین‌جا بالا می‌آیند.</li>
+          <li><b>پشتیبان بگیرید:</b> چون اطلاعات روی مرورگر است، هر چند وقت یک‌بار فایل پشتیبان دانلود کنید.</li>
+        </ol>
+        <button type="button" className="btn p lg" onClick={onAdd}>+ ثبت اولین چک یا حساب</button>
+      </section>
+    </>
+  }
+
+  const last = lastBackup()
+  const backupAge = last ? -daysTo(last) : null
+  const staleBackup = !last || backupAge > 14
+
+  return <>
+    <div className="head"><div><h1>نمای کلی</h1><p className="sub">امروز {shamsi(today())} · وضعیت نقدینگی، سررسیدها و پیگیری‌ها</p></div></div>
+
+    {staleBackup && <div className="banner" role="note">
+      <span>{last ? `آخرین پشتیبان ${fmt(backupAge)} روز پیش گرفته شده.` : 'هنوز از اطلاعات پشتیبان نگرفته‌اید.'} اگر داده‌های مرورگر پاک شود، بازگردانی ممکن نیست.</span>
+      <button type="button" className="btn sm" onClick={() => go('backup')}>پشتیبان‌گیری</button>
+    </div>}
+
+    <section className="cards">
+      <Stat label="دریافتنی باز" value={rial(sumIn)} tone="in-t" hint={`${fmt(ins.length)} سند باز`} />
+      <Stat label="پرداختنی باز" value={rial(sumOut)} tone="out-t" hint={`${fmt(outs.length)} سند باز`} />
+      <Stat label="خالص ۳۰ روز آینده" value={rial(net)} tone={net < 0 ? 'bad' : 'in-t'} hint="دریافتنی منهای پرداختنی؛ شامل معوق‌ها" />
+      <Stat label="معوق دریافتنی" value={rial(sumBy(lateIn, bal))} tone={lateIn.length ? 'bad' : ''}
+        hint={`${fmt(lateIn.length)} مورد · معوق پرداختنی: ${rial(sumBy(lateOut, bal))}`} />
+    </section>
+
+    {needsAction === 0 && <div className="allgood" role="status">✓ موردی برای اقدام امروز نیست؛ معوقی ندارید و تا ۷ روز آینده سررسیدی در راه نیست.</div>}
+
+    {late.length > 0 && <Block title="معوق‌ها" count={late.length} tone="bad" onAll={() => go('cheques')} allLabel="همه معوق‌ها">
+      {late.slice(0, LIMIT).map(i => <ItemRow key={i.id} item={i} name={nameOf(i.personId)} api={api} payments={payments} onPerson={onPerson} />)}
+    </Block>}
+
+    {soon.length > 0 && <Block title="سررسید ۷ روز آینده" count={soon.length} tone="info" onAll={() => go('cheques')}>
+      {soon.slice(0, LIMIT).map(i => <ItemRow key={i.id} item={i} name={nameOf(i.personId)} api={api} payments={payments} onPerson={onPerson} />)}
+    </Block>}
+
+    {dueFollow.length > 0 && <Block title="پیگیری‌های امروز و عقب‌افتاده" count={dueFollow.length} tone="warn" onAll={() => go('followups')}>
+      {dueFollow.slice(0, LIMIT).map(f => <div className="payment-row" key={f.id}>
+        <button type="button" className="linkish" onClick={() => onPerson(f.personId)}>{nameOf(f.personId)}</button>
+        <span>{shamsi(f.nextFollowUpDate)}</span>
+        <span>{f.note || f.result}</span>
+      </div>)}
+    </Block>}
+
+    <section className="card">
+      <h2>مقایسه مانده‌ها</h2>
+      <div className="barrow"><span>دریافتنی</span><div className="bartrack"><div className="barfill inbar" style={{ width: `${Math.max(2, sumIn / max * 100)}%` }} /></div><strong>{rial(sumIn)}</strong></div>
+      <div className="barrow"><span>پرداختنی</span><div className="bartrack"><div className="barfill outbar" style={{ width: `${Math.max(2, sumOut / max * 100)}%` }} /></div><strong>{rial(sumOut)}</strong></div>
+    </section>
+  </>
 }

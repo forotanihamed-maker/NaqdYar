@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { balance, isLate, isOpen } from '../domain/ledger'
 import { downloadCsv } from '../csv'
-import { Field, DateInput } from '../components/ui'
+import { Badge, EmptyState, Field, Stat, DateInput } from '../components/ui'
 import { fmt, rial, shamsi, today } from '../utils'
 
 const DIR_LABEL = { in: 'دریافتنی', out: 'پرداختنی' }
@@ -16,11 +16,13 @@ export default function Reports({ data, nameOf }) {
   const open = items.filter(i => isOpen(i, allPayments))
   const late = open.filter(i => isLate(i, allPayments))
   const payments = allPayments.filter(p => !p.deletedAt && (!from || p.date >= from) && (!to || p.date <= to))
+  const filtered = !!(from || to || dir !== 'all')
 
   const sumBalance = list => list.reduce((s, i) => s + balance(i, allPayments), 0)
   const paidSum = payments.reduce((s, p) => s + p.amount, 0)
   const personOfPayment = p => nameOf(allItems.find(i => i.id === p.itemId)?.personId || '')
   const statusOf = i => (i.status === 'bounced' ? 'برگشتی' : !isOpen(i, allPayments) ? 'تسویه‌شده' : isLate(i, allPayments) ? 'معوق' : 'باز')
+  const TONE = { 'برگشتی': 'bad', 'تسویه‌شده': 'ok', 'معوق': 'bad', 'باز': 'info' }
 
   const exportItems = () => downloadCsv([
     ['نام', 'نوع', 'سند', 'مبلغ', 'مانده', 'سررسید', 'وضعیت', 'توضیح'],
@@ -39,28 +41,42 @@ export default function Reports({ data, nameOf }) {
   return <>
     <div className="head"><div><h1>گزارش‌ها</h1><p className="sub">گزارش قابل فیلتر و خروجی سازگار با Excel</p></div></div>
     <section className="card">
-      <div className="tabs filters">
+      <div className="filters">
         <Field label="از تاریخ (شمسی)"><DateInput optional value={from} onChange={setFrom} /></Field>
         <Field label="تا تاریخ (شمسی)"><DateInput optional value={to} onChange={setTo} /></Field>
-        <select value={dir} onChange={e => setDir(e.target.value)}>
-          <option value="all">همه</option><option value="in">دریافتنی</option><option value="out">پرداختنی</option>
-        </select>
-        <button className="btn" onClick={() => { setFrom(''); setTo(''); setDir('all') }}>پاک‌کردن فیلتر</button>
+        <Field label="نوع">
+          <select value={dir} onChange={e => setDir(e.target.value)}>
+            <option value="all">همه</option><option value="in">دریافتنی</option><option value="out">پرداختنی</option>
+          </select>
+        </Field>
+        {filtered && <button type="button" className="btn ghost" onClick={() => { setFrom(''); setTo(''); setDir('all') }}>پاک‌کردن فیلتر</button>}
       </div>
-      <div className="cards">
-        <div className="card"><small>اسناد فیلترشده</small><b>{fmt(items.length)}</b></div>
-        <div className="card"><small>مانده باز</small><b>{rial(sumBalance(open))}</b></div>
-        <div className="card"><small>مانده معوق</small><b className="bad">{rial(sumBalance(late))}</b></div>
-        <div className="card"><small>پرداخت در بازه</small><b>{rial(paidSum)}</b></div>
-      </div>
-      <button className="btn p" onClick={exportItems}>خروجی Excel اسناد</button>{' '}
-      <button className="btn" onClick={exportPayments}>خروجی Excel پرداخت‌ها</button>{' '}
-      <button className="btn" onClick={exportSummary}>خروجی خلاصه</button>
     </section>
-    <section className="card"><h2>جدول اسناد</h2>
-      {items.length ? items.map(i => <div className="payment-row" key={i.id}>
-        <strong>{nameOf(i.personId)}</strong><span>{DIR_LABEL[i.dir]}</span><span>{shamsi(i.due)}</span><span>{statusOf(i)}</span><strong>{rial(balance(i, allPayments))}</strong>
-      </div>) : <p className="empty">موردی نیست</p>}
+    <section className="cards">
+      <Stat label="اسناد فیلترشده" value={fmt(items.length)} />
+      <Stat label="مانده باز" value={rial(sumBalance(open))} />
+      <Stat label="مانده معوق" value={rial(sumBalance(late))} tone={late.length ? 'bad' : ''} />
+      <Stat label="پرداخت در بازه" value={rial(paidSum)} />
+    </section>
+    <section className="card">
+      <div className="block-head">
+        <h2>جدول اسناد</h2>
+        <div className="head-actions">
+          <button type="button" className="btn sm p" onClick={exportItems}>خروجی Excel اسناد</button>
+          <button type="button" className="btn sm" onClick={exportPayments}>پرداخت‌ها</button>
+          <button type="button" className="btn sm" onClick={exportSummary}>خلاصه</button>
+        </div>
+      </div>
+      {items.length ? <div className="tbl-wrap"><table className="tbl">
+        <thead><tr><th>نام</th><th>نوع</th><th>سررسید</th><th>وضعیت</th><th>مانده</th></tr></thead>
+        <tbody>{[...items].sort((a, b) => a.due.localeCompare(b.due)).map(i => <tr key={i.id}>
+          <td><strong>{nameOf(i.personId)}</strong></td>
+          <td>{DIR_LABEL[i.dir]} · {i.type === 'cheque' ? 'چک' : 'حساب'}</td>
+          <td>{shamsi(i.due)}</td>
+          <td><Badge tone={TONE[statusOf(i)]}>{statusOf(i)}</Badge></td>
+          <td className="num"><strong>{rial(balance(i, allPayments))}</strong></td>
+        </tr>)}</tbody>
+      </table></div> : <EmptyState title="موردی نیست" text={filtered ? 'با این فیلترها سندی پیدا نشد؛ فیلتر را تغییر دهید.' : ''} />}
     </section>
   </>
 }

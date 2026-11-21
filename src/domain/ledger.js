@@ -40,3 +40,16 @@ export function promiseState(p, items, payments, now = today()) {
   if (p.date >= now) return { status: 'pending', paid }
   return { status: paid > 0 ? 'partial' : 'broken', paid } // overdue promise stays visible for follow-up (rule 7)
 }
+
+// How many things need attention today (used for the navigation badges).
+export function attention(data, now = today()) {
+  const { items, payments, followUps = [], promises = [] } = data
+  return {
+    late: items.filter(i => isLate(i, payments)).length,
+    followUps: followUps.filter(f => f.nextFollowUpDate && f.nextFollowUpDate <= now).length,
+    promises: promises.filter(p => {
+      const st = promiseState(p, items, payments, now).status
+      return st === 'broken' || st === 'partial' || (st === 'pending' && p.date === now)
+    }).length,
+  }
+}
