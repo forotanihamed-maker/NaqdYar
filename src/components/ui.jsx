@@ -1,5 +1,5 @@
 import { cloneElement, isValidElement, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { addDays, amountInput, daysTo, digits, fmt, rel, shamsi, toIso, today, toman } from '../utils'
+import { addDays, amountInput, daysTo, digits, faNum, fmt, jparts, normalizeText, rel, shamsi, toIso, today, toman } from '../utils.js'
 
 /* ---------- Icons ---------- */
 const ICONS = {
@@ -149,21 +149,21 @@ export const Search = ({ value, onChange, placeholder }) => (
 /* ---------- Jalali date input ---------- */
 const JMONTHS = ['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند']
 const JWEEK = ['ش','ی','د','س','چ','پ','ج']
-const jparts = iso => {
-  const d = new Date(iso + 'T12:00:00Z')
-  const p = new Intl.DateTimeFormat('en-US-u-ca-persian-nu-latn', { year: 'numeric', month: 'numeric', day: 'numeric', timeZone: 'UTC' }).formatToParts(d)
-  return Object.fromEntries(p.map(x => [x.type, x.value]))
-}
-const nfa = new Intl.NumberFormat('fa-IR', { useGrouping: false })
 
 // quick: [[label, days from today], ...] shows shortcut chips; relative: shows "۳ روز دیگر" under the field.
 export function DateInput({ value, onChange, optional, quick, relative, ...rest }) {
-  const selected = jparts(value || today())
+  const selected = jparts(value || today()) || jparts(today())
   const [open, setOpen] = useState(false)
   const [view, setView] = useState({ year: Number(selected.year), month: Number(selected.month) })
   const [text, setText] = useState(() => shamsi(value))
+  // What this field last sent up. Lets us follow external resets without wiping what the user is typing.
+  const last = useRef({ value, text: shamsi(value) })
   const wrap = useRef(null)
-  useEffect(() => { setText(shamsi(value)) }, [value])
+  useEffect(() => {
+    if (value === last.current.value) return
+    last.current = { value, text: shamsi(value) }
+    setText(shamsi(value))
+  }, [value])
   useEffect(() => {
     if (!open) return
     // inside a scrolling dialog the popup can start below the fold: bring it fully into view
@@ -193,10 +193,17 @@ export function DateInput({ value, onChange, optional, quick, relative, ...rest 
   }, [open, view])
 
   const syncView = iso => { const p = jparts(iso); setView({ year: +p.year, month: +p.month }) }
-  const choose = iso => { onChange(iso); setText(shamsi(iso)); syncView(iso); setOpen(false) }
+  const emit = (iso, shown) => {
+    last.current = { value: iso || '', text: shown }
+    setText(shown)
+    if (iso) syncView(iso)
+    onChange(iso || '')
+  }
+  const choose = iso => { emit(iso, shamsi(iso)); setOpen(false) }
   const maskDate = raw => {
     const d = digits(raw).replace(/\D/g, '').slice(0, 8)
-    return d.length > 6 ? `${d.slice(0, 4)}/${d.slice(4, 6)}/${d.slice(6)}` : d.length > 4 ? `${d.slice(0, 4)}/${d.slice(4)}` : d
+    const s = d.length > 6 ? `${d.slice(0, 4)}/${d.slice(4, 6)}/${d.slice(6)}` : d.length > 4 ? `${d.slice(0, 4)}/${d.slice(4)}` : d
+    return faNum(s)
   }
   const invalid = !!(text && !toIso(text))
   const todayIso = today()
@@ -205,13 +212,11 @@ export function DateInput({ value, onChange, optional, quick, relative, ...rest 
     <div className="date-input-row">
       <input {...rest} aria-invalid={rest['aria-invalid'] || (invalid ? true : undefined)} value={text} placeholder="۱۴۰۵/۰۹/۰۱" inputMode="numeric" autoComplete="off"
         onChange={e => {
-          const masked = maskDate(e.target.value); setText(masked)
-          const iso = toIso(masked)
-          if (!masked && optional) onChange('')
-          if (iso) { onChange(iso); syncView(iso) }
+          const masked = maskDate(e.target.value)
+          emit(toIso(masked), masked)
         }} />
       <button type="button" className="btn calendar-trigger" aria-expanded={open} onClick={() => setOpen(v => !v)}>تقویم</button>
-      {optional && value && <button type="button" className="btn ghost" onClick={() => { onChange(''); setText('') }}>پاک‌کردن</button>}
+      {optional && value && <button type="button" className="btn ghost" onClick={() => emit('', '')}>پاک‌کردن</button>}
     </div>
     {quick && <div className="chips">{quick.map(([label, n]) => {
       const iso = addDays(todayIso, n)
@@ -222,7 +227,7 @@ export function DateInput({ value, onChange, optional, quick, relative, ...rest 
     {open && <div className="jalali-calendar" role="dialog" aria-label="تقویم شمسی">
       <div className="calendar-head">
         <button type="button" aria-label="ماه قبل" onClick={() => changeMonth(-1)}><Icon name="chevR" size={18} /></button>
-        <strong>{JMONTHS[view.month - 1]} {nfa.format(view.year)}</strong>
+        <strong>{JMONTHS[view.month - 1]} {faNum(view.year)}</strong>
         <button type="button" aria-label="ماه بعد" onClick={() => changeMonth(1)}><Icon name="chevL" size={18} /></button>
       </div>
       <div className="calendar-grid">
@@ -231,7 +236,7 @@ export function DateInput({ value, onChange, optional, quick, relative, ...rest 
         {days.map(({ d, iso }) => (
           <button type="button" key={iso} aria-pressed={iso === value}
             className={'calendar-day' + (iso === value ? ' selected' : '') + (iso === todayIso ? ' today' : '') + ((offset + d - 1) % 7 === 6 ? ' fri' : '')}
-            onClick={() => choose(iso)}>{nfa.format(d)}</button>
+            onClick={() => choose(iso)}>{faNum(d)}</button>
         ))}
       </div>
       <button type="button" className="calendar-today" onClick={() => choose(todayIso)}>برو به امروز</button>
@@ -241,9 +246,9 @@ export function DateInput({ value, onChange, optional, quick, relative, ...rest 
 
 // Type to search existing people, click one to pick it, or keep the typed text as a new person.
 export function PersonPicker({ people, value, onChange, ...rest }) {
-  const q = value.name.trim().toLocaleLowerCase()
-  const matches = people.filter(p => !q || p.name.toLocaleLowerCase().includes(q)).slice(0, 6)
-  const exact = people.some(p => p.name.trim().toLocaleLowerCase() === q)
+  const q = normalizeText(value.name)
+  const matches = people.filter(p => !q || normalizeText(p.name).includes(q)).slice(0, 6)
+  const exact = people.some(p => normalizeText(p.name) === q)
   return <div>
     <input {...rest} value={value.name} placeholder={people.length ? 'نام شخص را بنویسید یا انتخاب کنید' : 'نام شخص (مثلاً: شرکت آلفا)'} autoComplete="off"
       onChange={e => onChange({ personId: '', name: e.target.value })} />

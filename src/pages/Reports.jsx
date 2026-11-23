@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { balance, isLate, isOpen } from '../domain/ledger'
-import { downloadCsv } from '../csv'
-import { Badge, EmptyState, Field, Stat, DateInput } from '../components/ui'
-import { fmt, rial, shamsi, today } from '../utils'
+import { balance, isLate, isOpen } from '../domain/ledger.js'
+import { downloadCsv } from '../csv.js'
+import { Badge, EmptyState, Field, Stat, DateInput } from '../components/ui.jsx'
+import { fmt, rial, shamsi, today } from '../utils.js'
 
 const DIR_LABEL = { in: 'دریافتنی', out: 'پرداختنی' }
 
@@ -25,16 +25,17 @@ export default function Reports({ data, nameOf }) {
   const TONE = { 'برگشتی': 'bad', 'تسویه‌شده': 'ok', 'معوق': 'bad', 'باز': 'info' }
 
   const exportItems = () => downloadCsv([
-    ['نام', 'نوع', 'سند', 'مبلغ', 'مانده', 'سررسید', 'وضعیت', 'توضیح'],
-    ...items.map(i => [nameOf(i.personId), DIR_LABEL[i.dir], i.type === 'cheque' ? 'چک' : 'حساب', i.amount, balance(i, allPayments), shamsi(i.due), statusOf(i), i.note]),
+    ['نام', 'نوع', 'سند', 'مبلغ', 'مانده', 'سررسید', 'سررسید (ISO)', 'وضعیت', 'توضیح'],
+    ...items.map(i => [nameOf(i.personId), DIR_LABEL[i.dir], i.type === 'cheque' ? 'چک' : 'حساب', i.amount, balance(i, allPayments), shamsi(i.due), i.due, statusOf(i), i.note]),
   ], `naqdyar-items-${today()}.csv`)
   const exportPayments = () => downloadCsv([
-    ['شخص', 'تاریخ', 'مبلغ', 'توضیح'],
-    ...payments.map(p => [personOfPayment(p), shamsi(p.date), p.amount, p.note]),
+    ['شخص', 'تاریخ', 'تاریخ (ISO)', 'مبلغ', 'توضیح'],
+    ...payments.map(p => [personOfPayment(p), shamsi(p.date), p.date, p.amount, p.note]),
   ], `naqdyar-payments-${today()}.csv`)
   const exportSummary = () => downloadCsv([
     ['گزارش نقدیار', shamsi(today())],
     ['نوع', DIR_LABEL[dir] || 'همه'], ['از', from ? shamsi(from) : ''], ['تا', to ? shamsi(to) : ''],
+    ['از (ISO)', from], ['تا (ISO)', to],
     ['مجموع اسناد', items.length], ['مانده باز', sumBalance(open)], ['معوق', sumBalance(late)], ['پرداخت در بازه', paidSum],
   ], `naqdyar-summary-${today()}.csv`)
 

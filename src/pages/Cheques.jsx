@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { isLate, isOpen } from '../domain/ledger'
-import { fmt } from '../utils'
-import ItemRow from '../components/ItemRow'
-import { EmptyState, Search, Tabs } from '../components/ui'
+import { isLate, isOpen } from '../domain/ledger.js'
+import { fmt, normalizeText } from '../utils.js'
+import ItemRow from '../components/ItemRow.jsx'
+import { EmptyState, Search, Tabs } from '../components/ui.jsx'
 
 const TABS = [['all', 'همه'], ['in', 'دریافتی'], ['out', 'پرداختی'], ['late', 'معوق'], ['closed', 'بسته‌شده']]
 
@@ -10,14 +10,15 @@ export default function Cheques({ items, nameOf, api, onAdd, payments = [], onPe
   const [tab, setTab] = useState('all')
   const [q, setQ] = useState('')
   const term = q.trim()
+  const needle = normalizeText(q)
   const open = i => isOpen(i, payments)
-  const match = i => !term || nameOf(i.personId).includes(term) || (i.note || '').includes(term)
+  const match = i => !needle || normalizeText(nameOf(i.personId)).includes(needle) || normalizeText(i.note).includes(needle)
   const inTab = {
     all: () => true, in: i => i.dir === 'in', out: i => i.dir === 'out',
     late: i => isLate(i, payments), closed: i => !open(i),
   }
   const base = items.filter(match)
-  const counts = Object.fromEntries(TABS.map(([k]) => [k, base.filter(inTab[k]).length]))
+  const counts = TABS.reduce((m, [k]) => { m[k] = base.filter(inTab[k]).length; return m }, {})
   // open documents first (by due date), settled ones at the bottom
   const list = base.filter(inTab[tab]).sort((a, b) => (open(b) - open(a)) || (open(a) ? a.due.localeCompare(b.due) : b.due.localeCompare(a.due)))
 

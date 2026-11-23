@@ -1,7 +1,7 @@
-import { balance, isLate, isOpen, sumBy } from '../domain/ledger'
-import { daysTo, fmt, lastBackup, rial, shamsi, today } from '../utils'
-import ItemRow from '../components/ItemRow'
-import { Badge, Stat } from '../components/ui'
+import { balance, isLate, isOpen, sumBy } from '../domain/ledger.js'
+import { daysTo, fmt, lastBackup, rial, shamsi, today } from '../utils.js'
+import ItemRow from '../components/ItemRow.jsx'
+import { Badge, Stat } from '../components/ui.jsx'
 
 const LIMIT = 5
 
@@ -38,7 +38,7 @@ export default function Home({ items, people, nameOf, api, onAdd, payments = [],
         <ol>
           <li><b>ثبت چک یا حساب:</b> مبلغ، شخص و تاریخ سررسید را وارد کنید.</li>
           <li><b>هر روز نمای کلی را ببینید:</b> معوق‌ها و سررسیدهای نزدیک همین‌جا بالا می‌آیند.</li>
-          <li><b>پشتیبان بگیرید:</b> چون اطلاعات روی مرورگر است، هر چند وقت یک‌بار فایل پشتیبان دانلود کنید.</li>
+          <li><b>پشتیبان بگیرید:</b> اطلاعات فقط روی همین گوشی ذخیره می‌شود؛ حذف برنامه یا عوض‌کردن گوشی آن را از بین می‌برد، پس هر چند وقت یک‌بار فایل پشتیبان بگیرید.</li>
         </ol>
         <button type="button" className="btn p lg" onClick={onAdd}>+ ثبت اولین چک یا حساب</button>
       </section>
@@ -47,13 +47,13 @@ export default function Home({ items, people, nameOf, api, onAdd, payments = [],
 
   const last = lastBackup()
   const backupAge = last ? -daysTo(last) : null
-  const staleBackup = !last || backupAge > 14
+  const staleBackup = !last || backupAge > 7
 
   return <>
     <div className="head"><div><h1>نمای کلی</h1><p className="sub">امروز {shamsi(today())} · وضعیت نقدینگی، سررسیدها و پیگیری‌ها</p></div></div>
 
     {staleBackup && <div className="banner" role="note">
-      <span>{last ? `آخرین پشتیبان ${fmt(backupAge)} روز پیش گرفته شده.` : 'هنوز از اطلاعات پشتیبان نگرفته‌اید.'} اگر داده‌های مرورگر پاک شود، بازگردانی ممکن نیست.</span>
+      <span>{last ? `آخرین پشتیبان ${fmt(backupAge)} روز پیش گرفته شده.` : 'هنوز از اطلاعات پشتیبان نگرفته‌اید.'} اگر برنامه را حذف کنید، اطلاعات برنامه را پاک کنید یا گوشی را عوض کنید، این اطلاعات از بین می‌رود.</span>
       <button type="button" className="btn sm" onClick={() => go('backup')}>پشتیبان‌گیری</button>
     </div>}
 

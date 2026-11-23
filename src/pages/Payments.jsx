@@ -1,14 +1,15 @@
 import { useState } from 'react'
-import { balance } from '../domain/ledger'
-import PaymentForm from '../components/PaymentForm'
-import { EmptyState, Search } from '../components/ui'
-import { rial, shamsi } from '../utils'
+import { balance } from '../domain/ledger.js'
+import PaymentForm from '../components/PaymentForm.jsx'
+import { EmptyState, Search } from '../components/ui.jsx'
+import { normalizeText, rial, shamsi } from '../utils.js'
 
 export default function Payments({ data, api, nameOf, onPerson }) {
   const [edit, setEdit] = useState(null), [query, setQuery] = useState('')
   const personOf = p => data.items.find(i => i.id === p.itemId)?.personId || ''
   const term = query.trim()
-  const list = data.payments.filter(p => !p.deletedAt && (nameOf(personOf(p)).includes(term) || p.note.includes(term))).sort((a, b) => b.date.localeCompare(a.date))
+  const needle = normalizeText(query)
+  const list = data.payments.filter(p => !p.deletedAt && (!needle || normalizeText(nameOf(personOf(p))).includes(needle) || normalizeText(p.note).includes(needle))).sort((a, b) => b.date.localeCompare(a.date))
   const item = edit && data.items.find(i => i.id === edit.itemId)
   return <>
     <div className="head"><div><h1>تاریخچه پرداخت‌ها</h1><p className="sub">پرداخت‌های ثبت‌شده برای حساب‌های بدون چک</p></div></div>

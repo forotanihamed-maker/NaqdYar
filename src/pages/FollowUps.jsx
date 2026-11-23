@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import FollowUpForm from '../components/FollowUpForm'
-import { Badge, EmptyState, Search, Tabs } from '../components/ui'
-import { rial, shamsi, today } from '../utils'
+import FollowUpForm from '../components/FollowUpForm.jsx'
+import { Badge, EmptyState, Search, Tabs } from '../components/ui.jsx'
+import { rial, shamsi, today, normalizeText } from '../utils.js'
 
 const TABS = [['due', 'امروز و عقب‌افتاده'], ['future', 'آینده'], ['none', 'بدون موعد'], ['all', 'همه']]
 const blank = () => ({ personId: '', itemId: '', contactDate: today(), method: 'تماس', result: '', note: '', promisedAmount: '', promiseDate: '', nextFollowUpDate: '' })
@@ -12,8 +12,9 @@ export default function FollowUps({ data, api, nameOf, onPerson }) {
   const [q, setQ] = useState('')
   const now = today()
 
+  const needle = normalizeText(q)
   const list = (data.followUps || [])
-    .filter(f => nameOf(f.personId).includes(q.trim()))
+    .filter(f => normalizeText(nameOf(f.personId)).includes(needle))
     .sort((a, b) => (a.nextFollowUpDate || '9999').localeCompare(b.nextFollowUpDate || '9999'))
   const groups = {
     due: list.filter(f => f.nextFollowUpDate && f.nextFollowUpDate <= now),
@@ -21,7 +22,7 @@ export default function FollowUps({ data, api, nameOf, onPerson }) {
     none: list.filter(f => !f.nextFollowUpDate),
     all: list,
   }
-  const counts = Object.fromEntries(Object.entries(groups).map(([k, v]) => [k, v.length]))
+  const counts = Object.keys(groups).reduce((m, k) => { m[k] = groups[k].length; return m }, {})
   const save = f => (f.id ? (api.updateFollowUp(f.id, f), true) : api.addFollowUp(f))
 
   return <>

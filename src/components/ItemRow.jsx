@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { balance, isLate, isOpen, paymentTotal } from '../domain/ledger'
-import { daysTo, rel, rial, shamsi } from '../utils'
-import { Badge } from './ui'
-import PaymentForm from './PaymentForm'
+import { balance, isLate, isOpen, paymentTotal } from '../domain/ledger.js'
+import { daysTo, rel, rial, shamsi } from '../utils.js'
+import { Badge } from './ui.jsx'
+import PaymentForm from './PaymentForm.jsx'
 
 // One cheque/account. `showName={false}` is for lists that are already grouped under a person.
 export default function ItemRow({ item, name, api, payments = [], onPerson, showName = true }) {

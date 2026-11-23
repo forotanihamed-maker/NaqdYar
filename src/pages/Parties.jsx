@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { balance, isLate, isOpen, sumBy } from '../domain/ledger'
-import { daysTo, fmt, rial } from '../utils'
-import ItemRow from '../components/ItemRow'
-import { Badge, EmptyState, Icon, Search, Stat } from '../components/ui'
+import { balance, isLate, isOpen, sumBy } from '../domain/ledger.js'
+import { daysTo, fmt, normalizeText, rial } from '../utils.js'
+import ItemRow from '../components/ItemRow.jsx'
+import { Badge, EmptyState, Icon, Search, Stat } from '../components/ui.jsx'
 
 // dir 'in'  -> بدهکاران (people who owe us); dir 'out' -> طلبکاران (people we owe)
 export default function Parties({ dir, items, people, api, payments = [], onPerson }) {
@@ -20,7 +20,7 @@ export default function Parties({ dir, items, people, api, payments = [], onPers
   }).filter(r => r.mine.length).sort((a, b) => b.score - a.score)
   const total = rows.reduce((t, r) => t + r.total, 0)
   const lateTotal = rows.reduce((t, r) => t + r.lateSum, 0)
-  const shown = rows.filter(r => !q.trim() || r.p.name.includes(q.trim()))
+  const shown = rows.filter(r => !q.trim() || normalizeText(r.p.name).includes(normalizeText(q)))
 
   return <>
     <div className="head"><div>

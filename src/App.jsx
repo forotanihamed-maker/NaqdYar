@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useLedger } from './hooks/useLedger'
-import { attention } from './domain/ledger'
-import ItemForm from './components/ItemForm'
-import { Icon } from './components/ui'
-import Home from './pages/Home'
-import Cheques from './pages/Cheques'
-import Parties from './pages/Parties'
-import Backup from './pages/Backup'
-import Payments from './pages/Payments'
-import FollowUps from './pages/FollowUps'
-import Promises from './pages/Promises'
-import Reports from './pages/Reports'
-import PersonDetail from './pages/PersonDetail'
+import { useLedger } from './hooks/useLedger.js'
+import { attention } from './domain/ledger.js'
+import { today } from './utils.js'
+import ItemForm from './components/ItemForm.jsx'
+import { Icon } from './components/ui.jsx'
+import Home from './pages/Home.jsx'
+import Cheques from './pages/Cheques.jsx'
+import Parties from './pages/Parties.jsx'
+import Backup from './pages/Backup.jsx'
+import Payments from './pages/Payments.jsx'
+import FollowUps from './pages/FollowUps.jsx'
+import Promises from './pages/Promises.jsx'
+import Reports from './pages/Reports.jsx'
+import PersonDetail from './pages/PersonDetail.jsx'
 
 // [key, label, icon]
 const GROUPS = [
@@ -21,10 +22,22 @@ const GROUPS = [
   { title: 'ابزار', items: [['reports', 'گزارش‌ها', 'chart'], ['backup', 'پشتیبان', 'save']] },
 ]
 const ALL = GROUPS.flatMap(g => g.items)
-const TITLES = { ...Object.fromEntries(ALL.map(([k, t]) => [k, t])), person: 'پرونده شخص' }
+const TITLES = { ...ALL.reduce((m, [k, t]) => { m[k] = t; return m }, {}), person: 'پرونده شخص' }
 const MOBILE_MAIN = ['home', 'cheques']          // left of the + button
 const MOBILE_MAIN2 = ['promises']                 // right of the + button
 const SHORT = { cheques: 'اسناد', promises: 'وصول' } // one-line labels for the narrow bottom bar
+
+// Each toast owns its timer, so two quick deletes stay undoable at the same time.
+function ToastItem({ toast, onDone }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, toast.undo ? 7000 : 3200)
+    return () => clearTimeout(t)
+  }, [toast.id])
+  return <div className="toast" role="status">
+    <span>{toast.msg}</span>
+    {toast.undo && <button type="button" onClick={() => { toast.undo(); onDone() }}>بازگردانی</button>}
+  </div>
+}
 
 export default function App() {
   const [page, setPage] = useState('home')
@@ -32,22 +45,29 @@ export default function App() {
   const [from, setFrom] = useState('debtors')     // where "back" goes from a person's file
   const [form, setForm] = useState(null)          // { initial } while the add dialog is open
   const [more, setMore] = useState(false)
-  const [toast, setToast] = useState(null)        // { id, msg, undo? }
+  const [toasts, setToasts] = useState([])
+  const [day, setDay] = useState(today)           // Android can keep the app open across midnight
 
-  const notify = useCallback((msg, undo) => setToast({ id: Date.now() + Math.random(), msg, undo }), [])
+  const notify = useCallback((msg, undo) => {
+    const id = Date.now() + Math.random()
+    setToasts(list => [...list.slice(-2), { id, msg, undo }])
+  }, [])
+  const dismiss = id => setToasts(list => list.filter(t => t.id !== id))
   const ledger = useLedger(notify)
   const { people, items } = ledger.data
-  const names = useMemo(() => Object.fromEntries(people.map(p => [p.id, p.name])), [people])
+  const names = useMemo(() => people.reduce((m, p) => { m[p.id] = p.name; return m }, {}), [people])
   const nameOf = id => names[id] || 'شخص حذف‌شده'
-  const counts = useMemo(() => attention(ledger.data), [ledger.data])
+  const counts = useMemo(() => attention(ledger.data), [ledger.data, day])
   const badge = { cheques: counts.late, followups: counts.followUps, promises: counts.promises }
 
-  // Toasts with an undo stay longer so there is time to react.
+  // Coming back from the background or crossing midnight must refresh "today", badges and late lists.
   useEffect(() => {
-    if (!toast) return
-    const t = setTimeout(() => setToast(null), toast.undo ? 7000 : 3200)
-    return () => clearTimeout(t)
-  }, [toast])
+    const sync = () => setDay(today())
+    document.addEventListener('visibilitychange', sync)
+    window.addEventListener('focus', sync)
+    const timer = setInterval(sync, 60000)
+    return () => { document.removeEventListener('visibilitychange', sync); window.removeEventListener('focus', sync); clearInterval(timer) }
+  }, [])
 
   const go = k => { setPersonId(null); setPage(k); setMore(false) }
   const openPerson = id => { if (page !== 'person') setFrom(page); setPersonId(id); setPage('person'); setMore(false) }
@@ -114,9 +134,8 @@ export default function App() {
     </div>}
 
     {form && <ItemForm people={people} initial={form.initial} onClose={() => setForm(null)} onSubmit={ledger.addItem} />}
-    {toast && <div className="toast" role="status" key={toast.id}>
-      <span>{toast.msg}</span>
-      {toast.undo && <button type="button" onClick={() => { toast.undo(); setToast(null) }}>بازگردانی</button>}
+    {toasts.length > 0 && <div className="toasts">
+      {toasts.map(t => <ToastItem key={t.id} toast={t} onDone={() => dismiss(t.id)} />)}
     </div>}
   </>
 }

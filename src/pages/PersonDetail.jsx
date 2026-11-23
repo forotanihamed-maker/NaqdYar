@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { balance, isLate, isOpen, promiseState, PROMISE_LABEL } from '../domain/ledger'
-import { rial, shamsi, today } from '../utils'
-import ItemRow from '../components/ItemRow'
-import FollowUpForm from '../components/FollowUpForm'
-import { AmountInput, Badge, EmptyState, Field, FormActions, Icon, Modal, Stat } from '../components/ui'
+import { balance, isLate, isOpen, promiseState, PROMISE_LABEL } from '../domain/ledger.js'
+import { rial, shamsi, today } from '../utils.js'
+import ItemRow from '../components/ItemRow.jsx'
+import FollowUpForm from '../components/FollowUpForm.jsx'
+import { AmountInput, Badge, EmptyState, Field, FormActions, Icon, Modal, Stat } from '../components/ui.jsx'
 
 const blankFollowUp = personId => ({ personId, itemId: '', contactDate: today(), method: 'تماس', result: '', note: '', promisedAmount: '', promiseDate: '', nextFollowUpDate: '' })
-const PROMISE_TONE = { pending: 'info', paid: 'ok', partial: 'warn', broken: 'bad', cancelled: 'muted' }
+const PROMISE_TONE = { pending: 'info', paid: 'ok', partial: 'warn', broken: 'bad', cancelled: 'muted', deleted: 'muted' }
 
 export default function PersonDetail({ person, data, api, onBack, onAddItem, nameOf }) {
   const [edit, setEdit] = useState(false)

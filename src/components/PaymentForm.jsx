@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { rial, today } from '../utils'
-import { Modal, Field, AmountInput, DateInput, FormActions } from './ui'
+import { rial, today } from '../utils.js'
+import { Modal, Field, AmountInput, DateInput, FormActions } from './ui.jsx'
 
 export default function PaymentForm({ item, name, payment, remaining, onClose, onSubmit }) {
   const [form, setForm] = useState({ amount: payment?.amount ?? '', date: payment?.date ?? today(), note: payment?.note ?? '' })

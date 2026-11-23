@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { today } from '../utils'
-import { Modal, Field, AmountInput, DateInput, PersonPicker, Seg, FormActions } from './ui'
+import { today } from '../utils.js'
+import { Modal, Field, AmountInput, DateInput, PersonPicker, Seg, FormActions } from './ui.jsx'
 
 const DUE_QUICK = [['۳۰ روز دیگر', 30], ['۶۰ روز دیگر', 60], ['۹۰ روز دیگر', 90]]
 

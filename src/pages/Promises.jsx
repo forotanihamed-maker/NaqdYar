@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { balance, isLate, isOpen, promiseState, PROMISE_LABEL } from '../domain/ledger'
-import { daysTo, fmt, rel, rial, shamsi, today } from '../utils'
-import { AmountInput, Badge, DateInput, EmptyState, Field, FormActions, Modal, Stat, Tabs } from '../components/ui'
+import { balance, isLate, isOpen, promiseState, PROMISE_LABEL } from '../domain/ledger.js'
+import { daysTo, fmt, rel, rial, shamsi, today } from '../utils.js'
+import { AmountInput, Badge, DateInput, EmptyState, Field, FormActions, Modal, Stat, Tabs } from '../components/ui.jsx'
 
 const TABS = [['todo', 'نیازمند اقدام'], ['pending', 'در انتظار'], ['paid', 'پرداخت‌شده'], ['cancelled', 'لغوشده'], ['all', 'همه']]
-const TONE = { pending: 'info', paid: 'ok', partial: 'warn', broken: 'bad', cancelled: 'muted' }
+const TONE = { pending: 'info', paid: 'ok', partial: 'warn', broken: 'bad', cancelled: 'muted', deleted: 'muted' }
 const PROMISE_QUICK = [['فردا', 1], ['۳ روز دیگر', 3], ['هفته دیگر', 7]]
 
 // Daily collection screen: who to chase today, which promises failed, which late debtors have no promise yet.
@@ -44,7 +44,7 @@ export default function Promises({ data, api, nameOf, onPerson }) {
     <span>{shamsi(p.date)} · {rel(daysTo(p.date))}</span>
     <span>پرداخت‌شده از زمان وعده: {rial(p.paid)}</span>
     <Badge tone={TONE[p.status]}>{PROMISE_LABEL[p.status]}</Badge>
-    {p.status !== 'paid' && p.status !== 'cancelled' && <button type="button" className="btn sm ghost x" onClick={() => api.cancelPromise(p.id)}>لغو</button>}
+    {p.status !== 'paid' && p.status !== 'cancelled' && p.status !== 'deleted' && <button type="button" className="btn sm ghost x" onClick={() => api.cancelPromise(p.id)}>لغو</button>}
   </div>
 
   return <>

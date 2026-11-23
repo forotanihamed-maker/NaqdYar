@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { rial, shamsi } from '../utils'
-import { Modal, Field, AmountInput, DateInput, Seg, FormActions } from './ui'
+import { rial, shamsi } from '../utils.js'
+import { Modal, Field, AmountInput, DateInput, Seg, FormActions } from './ui.jsx'
 
 const METHODS = ['تماس', 'پیام', 'مراجعه', 'سایر']
 const NEXT_QUICK = [['فردا', 1], ['۳ روز دیگر', 3], ['هفته دیگر', 7]]
